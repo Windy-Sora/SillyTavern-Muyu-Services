@@ -1,0 +1,12 @@
+{
+  "name": "gd-muyu-history",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Optional SillyTavern server services for the Muyu agent",
+  "main": "index.cjs",
+  "type": "commonjs",
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test" },
+  "license": "MIT",
+  "repository": "https://github.com/Windy-Sora/SillyTavern-Muyu-Services"
+}
