@@ -3,7 +3,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { diagnostics } = require('./diagnostics.cjs');
-const SERVICE_VERSION = '0.3.0';
+const SERVICE_VERSION = '0.6.0';
 function userRoot(req) {
     const root = req.user?.directories?.root;
     if (typeof root !== 'string' || !root.trim() || root.includes('\0')) throw Error('HISTORY_IDENTITY_UNAVAILABLE');
@@ -37,7 +37,7 @@ function registerServiceStatus(router, limits) {
         try {
             userRoot(req);
             res.json({ version: 1, serviceVersion: SERVICE_VERSION,
-                capabilities: { history: 1, search: 1, storageCheck: 1, diagnostics: 1 }, limits });
+                capabilities: { history: 1, search: 1, storageCheck: 1, diagnostics: 1 }, toolProtocols: { documentSearch: 1, webFetch: 1, workspaceWrite: 1, jsonValidate: 1 }, limits });
         } catch (error) { res.status(500).json({ error: safeError(error) }); }
     });
     router.post('/service/storage-check', (req, res) => {

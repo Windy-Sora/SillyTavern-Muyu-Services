@@ -18,7 +18,8 @@ test('status and storage checks require trusted identity and explicit confirmati
     const routes = new Map(); registerServiceStatus({ get: (p, h) => routes.set(p, h), post: (p, h) => routes.set(p, h) }, { records: 64 });
     const invoke = (route, req) => new Promise(resolve => { const res = { code: 200, status(code) { this.code = code; return this; }, json(value) { resolve({ code: this.code, value }); } }; routes.get(route)(req, res); });
     assert.equal((await invoke('/service/status', { query: { root: process.cwd() } })).value.error, 'HISTORY_IDENTITY_UNAVAILABLE');
-    const valid = await invoke('/service/status', { user: { directories: { root: process.cwd() } } }); assert.equal(valid.value.serviceVersion, '0.3.0'); assert.equal(valid.value.capabilities.storageCheck, 1); assert.equal(valid.value.capabilities.diagnostics, 1);
+    const valid = await invoke('/service/status', { user: { directories: { root: process.cwd() } } }); assert.equal(valid.value.serviceVersion, '0.6.0'); assert.equal(valid.value.capabilities.storageCheck, 1); assert.equal(valid.value.capabilities.diagnostics, 1);
+    assert.deepEqual(valid.value.toolProtocols, { documentSearch: 1, webFetch: 1, workspaceWrite: 1, jsonValidate: 1 }); // Never advertise not-yet-implemented routes.
     for (const body of [undefined, {}, { confirm: false }, { confirm: true, root: process.cwd() }]) assert.equal((await invoke('/service/storage-check', { body })).code, 400);
     assert.equal((await invoke('/service/storage-check', { body: { confirm: true } })).value.error, 'HISTORY_IDENTITY_UNAVAILABLE');
 });

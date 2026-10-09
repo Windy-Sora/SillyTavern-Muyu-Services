@@ -4,6 +4,9 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { registerWebSearch } = require('./web-search.cjs');
+const { registerDocuments } = require('./documents.cjs');
+const { registerPages } = require('./web-page.cjs');
+const { registerWorkspace } = require('./workspace.cjs');
 const { registerServiceStatus } = require('./service-status.cjs');
 const { diagnostics, registerDiagnostics } = require('./diagnostics.cjs');
 
@@ -117,6 +120,9 @@ function respond(res, work, req, operation) {
 }
 function init(router) {
     registerWebSearch(router);
+    registerDocuments(router);
+    registerPages(router);
+    registerWorkspace(router);
     registerServiceStatus(router, { records: 64, recordBytes: maxBytes, totalBytes: 256 * 1024 * 1024, messages: 4096 });
     registerDiagnostics(router, diagnostics);
     router.get('/health', (_req, res) => res.json({ version: 1 }));
