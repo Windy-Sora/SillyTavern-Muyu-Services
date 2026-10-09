@@ -58,10 +58,17 @@ async function snapshot(dir, name, signal) {
 async function quota(dir, name, bytes) {
     const entries = await fs.readdir(dir, { withFileTypes: true });
     if (entries.length > 4096) fail('WORKSPACE_CAPACITY');
+    // Resolve the actual entry spelling: case aliases on Windows are updates,
+    // while separately named files on case-sensitive filesystems still count.
+    const target = await fs.realpath(path.join(dir, name)).catch(error => {
+        if (error.code === 'ENOENT') return null;
+        throw error;
+    });
+    const existingName = target ? path.basename(target) : null;
     let count = 0, total = bytes;
     for (const entry of entries) {
         if (entry.name.startsWith('.')) continue;
-        if (entry.name !== name) {
+        if (entry.name !== existingName) {
             const stat = await fs.lstat(path.join(dir, entry.name));
             if (stat.isSymbolicLink() || !stat.isFile()) fail('WORKSPACE_UNAVAILABLE');
             count++; total += stat.size;

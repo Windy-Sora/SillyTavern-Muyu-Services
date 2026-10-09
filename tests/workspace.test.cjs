@@ -98,3 +98,19 @@ test('HTTP routes never echo private paths or underlying errors', async () => {
     await new Promise(resolve => setImmediate(resolve));
     assert.deepEqual(res.value, { error: 'HISTORY_IDENTITY_UNAVAILABLE' });
 });
+test('BUG-2: full workspace quota excludes the actual updated entry, not request spelling', async t => {
+    const f = await fixture(t);
+    const initial = await f.apply(await f.preview('before'));
+    let aliases = true;
+    try { await fs.readFile(path.join(f.dir, 'NOTES.md')); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; aliases = false; }
+    let revision = initial.revision;
+    if (!aliases) revision = (await f.apply(await f.preview('distinct', null, 'NOTES.md'))).revision;
+    for (let i = 0; i < (aliases ? 63 : 62); i++) await fs.writeFile(path.join(f.dir, 'user' + i + '.txt'), 'x');
+    const result = await f.apply(await f.preview('after', revision, 'NOTES.md'));
+    assert.equal(result.status, 'written');
+    assert.equal(await fs.readFile(path.join(f.dir, 'NOTES.md'), 'utf8'), 'after');
+    assert.equal(await fs.readFile(path.join(f.dir, 'notes.md'), 'utf8'), aliases ? 'after' : 'before');
+    assert.equal((await fs.readdir(f.dir)).length, 64);
+    await assert.rejects(f.apply(await f.preview('overflow', null, 'new.txt')), /WORKSPACE_CAPACITY/);
+});
