@@ -7,15 +7,15 @@ const { registerWebSearch } = require('./web-search.cjs');
 
 const info = { id: 'gd-muyu-history', name: 'Group Director Muyu Services', description: 'Private Muyu conversation files and optional web search' };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const maxBytes = 2 * 1024 * 1024;
+const maxBytes = 32 * 1024 * 1024;
 const fields = new Set(['version', 'id', 'revision', 'scope', 'title', 'createdAt', 'updatedAt', 'messages', 'required', 'status', 'archived', 'imported', 'contextSummary', 'receipts', 'scopeChanges']);
 const queues = new Map();
 function directory(req) {
     const root = req.user?.directories?.root;
-    if (typeof root !== 'string' || !path.isAbsolute(root)) throw Error('HISTORY_IDENTITY_UNAVAILABLE');
+    if (typeof root !== 'string' || !root.trim() || root.includes('\0')) throw Error('HISTORY_IDENTITY_UNAVAILABLE');
     const namespace = req.query?.namespace;
     if (typeof namespace !== 'string' || !uuid.test(namespace)) throw Error('HISTORY_INVALID');
-    return path.join(root, '.group-director', 'muyu', 'history', namespace);
+    return path.join(path.resolve(root), '.group-director', 'muyu', 'history', namespace);
 }
 function file(dir, id) {
     if (typeof id !== 'string' || !uuid.test(id)) throw Error('HISTORY_INVALID');
@@ -25,9 +25,9 @@ function check(record, id) {
     if (!record || typeof record !== 'object' || Array.isArray(record) || record.id !== id || Object.keys(record).some(key => !fields.has(key)) ||
         ![1, 2, 3, 4, 5, 6, 7].includes(record.version) || !Number.isSafeInteger(record.revision) || record.revision < 0 ||
         typeof record.scope !== 'string' || record.scope.length > 4096 || typeof record.title !== 'string' || record.title.length > 100 ||
-        !Array.isArray(record.messages) || record.messages.length > 256 || record.messages.some(message => !message ||
+        !Array.isArray(record.messages) || record.messages.length > 4096 || record.messages.some(message => !message ||
             Object.keys(message).some(key => !['role', 'content', 'runId', ...(record.version >= 7 ? ['origin'] : [])].includes(key)) ||
-            !['user', 'assistant'].includes(message.role) || typeof message.content !== 'string' || message.content.length > 32768 ||
+            !['user', 'assistant'].includes(message.role) || typeof message.content !== 'string' || Buffer.byteLength(JSON.stringify(message.content), 'utf8') > 2 * 1024 * 1024 ||
             typeof message.runId !== 'string' || message.runId.length > 150 ||
             Object.hasOwn(message, 'origin') && (message.role !== 'user' || !['question', 'continuation'].includes(message.origin))) ||
         !Array.isArray(record.required) || record.required.length > 128 || record.required.some(value => typeof value !== 'string' || value.length > 200) ||
@@ -85,7 +85,7 @@ function createFileStore(dir) {
                 const next = check({ ...record, revision: expectedRevision + 1 }, id);
                 const listed = await this.list();
                 if (!old && listed.length >= 64) throw Error('HISTORY_CAPACITY');
-                if (listed.filter(row => row.id !== id).reduce((sum, row) => sum + row.bytes, 0) + summary(next).bytes > 16 * 1024 * 1024) throw Error('HISTORY_CAPACITY');
+                if (listed.filter(row => row.id !== id).reduce((sum, row) => sum + row.bytes, 0) + summary(next).bytes > 256 * 1024 * 1024) throw Error('HISTORY_CAPACITY');
                 await replace(dir, id, next);
                 return next;
             });
