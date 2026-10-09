@@ -60,6 +60,9 @@ function summary(record) {
     return { ...metadata, count: messages.length, bytes: Buffer.byteLength(JSON.stringify(record), 'utf8') };
 }
 function serialized(key, work) {
+    // Windows path aliases must share a queue without moving existing history folders.
+    key = path.resolve(key);
+    if (process.platform === 'win32') key = key.toLowerCase();
     const previous = queues.get(key) || Promise.resolve();
     const result = previous.catch(() => {}).then(work);
     const tail = result.catch(() => {});

@@ -93,3 +93,40 @@ test('rejects invalid requests before reaching upstream', async () => {
     await assert.rejects(service.search({ ...input, maxResults: 11 }, { account: 'test-account' }), /WEB_REQUEST_INVALID/);
     await assert.rejects(service.search(input), /WEB_IDENTITY_UNAVAILABLE/);
 });
+test('BUG-1: Windows namespace aliases share revision and deletion queues', { skip: process.platform !== 'win32' }, async t => {
+    const account = await fs.mkdtemp(path.join(os.tmpdir(), 'muyu-namespace-alias-'));
+    t.after(() => fs.rm(account, { recursive: true, force: true }));
+    const routes = new Map();
+    init(Object.fromEntries(['get', 'put', 'delete', 'post'].map(method => [method, (route, handler) => routes.set(method + route, handler)])));
+    const namespace = 'abcdefab-abcd-abcd-abcd-abcdefabcdef';
+    const call = (method, ns, saved, body) => new Promise(resolve => {
+        const res = { code: 200, status(code) { this.code = code; return this; }, json(value) { resolve({ code: this.code, value }); } };
+        routes.get(method + '/records/:id')({ user: { directories: { root: account } }, query: { namespace: ns }, params: { id: saved.id }, body }, res);
+    });
+    const original = record(), created = await call('put', namespace, original, { record: original, expectedRevision: 0 });
+    assert.equal(created.code, 200);
+    const results = await Promise.all(['A', 'B'].map((title, i) => call('put', i ? namespace.toUpperCase() : namespace, original, {
+        record: { ...created.value, title }, expectedRevision: 1,
+    })));
+    assert.deepEqual(results.map(row => row.code).sort(), [200, 409]);
+    assert.equal(results.find(row => row.code === 409).value.error, 'HISTORY_CONFLICT');
+    const winner = results.find(row => row.code === 200).value;
+    const dir = path.join(account, '.group-director', 'muyu', 'history', namespace);
+    assert.deepEqual(await createFileStore(dir).read(original.id), winner);
+    const mixed = await Promise.all([
+        call('put', namespace, winner, { record: { ...winner, title: 'Updated' }, expectedRevision: 2 }),
+        call('delete', namespace.toUpperCase(), winner, { revision: 2 }),
+    ]);
+    assert.deepEqual(mixed.map(row => row.code).sort(), [200, 409]);
+});
+
+test('BUG-1: case-distinct namespace directories remain separate on non-Windows systems', { skip: process.platform === 'win32' }, async t => {
+    const account = await fs.mkdtemp(path.join(os.tmpdir(), 'muyu-namespace-distinct-'));
+    t.after(() => fs.rm(account, { recursive: true, force: true }));
+    const lower = createFileStore(path.join(account, 'abcdef')), upper = createFileStore(path.join(account, 'ABCDEF'));
+    const original = record();
+    const saved = await Promise.all([lower.create(original), upper.create({ ...original, title: 'Upper' })]);
+    assert.equal(saved[0].revision, 1); assert.equal(saved[1].revision, 1);
+    assert.equal((await lower.read(original.id)).title, original.title);
+    assert.equal((await upper.read(original.id)).title, 'Upper');
+});
