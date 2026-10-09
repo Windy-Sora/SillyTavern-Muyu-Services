@@ -78,3 +78,26 @@ test('HTTP document routes sanitize errors and honor abort before any document r
     const controller = new AbortController(); controller.abort();
     await assert.rejects(createDocumentService().run('roots', { user: { directories: { root: process.cwd() } } }, {}, controller.signal), /DOCUMENT_ABORTED/);
 });
+test('BUG-3: Unicode lowercase expansion maps search snippets to original UTF-16 positions', async t => {
+    const f = await fixture(t); await fs.mkdir(f.workspace, { recursive: true });
+    const contents = [
+        'İ'.repeat(600) + 'needle',
+        '😀İ'.repeat(600) + 'NEEDLE',
+        'İ'.repeat(600) + ' ΟΣ',
+        'İ'.repeat(600) + '[a+b]',
+    ];
+    await fs.writeFile(path.join(f.workspace, 'unicode.md'), contents.join('\n'));
+    const base = await f.args();
+    const search = query => f.service.run('search', f.req, { ...base, query });
+    const hits = await search('needle');
+    assert.deepEqual(hits.items.map(row => row.line), [1, 2]);
+    assert.ok(hits.items.every(row => row.snippet.toLowerCase().includes('needle') && row.snippet.length <= 500));
+    const greek = await search('ος');
+    assert.equal(greek.items.length, 1); assert.ok(greek.items[0].snippet.includes('ΟΣ'));
+    const literal = await search('[a+b]');
+    assert.equal(literal.items.length, 1); assert.ok(literal.items[0].snippet.includes('[a+b]'));
+    const expansion = await search('i\u0307');
+    assert.ok(expansion.items.every(row => row.snippet.includes('İ')));
+    const read = await f.service.run('read', f.req, { ...base, path: 'unicode.md', revision: hits.items[0].revision, line: 1, maxChars: 1000 });
+    assert.ok(read.text.startsWith(contents[0]));
+});

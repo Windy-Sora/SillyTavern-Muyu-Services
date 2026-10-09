@@ -195,9 +195,21 @@ function createDocumentService() {
                 else {
                     const lines = saved.text.split(/\r?\n/), query = input.query.trim().toLowerCase();
                     for (let i = 0; i < lines.length; i++) {
-                        const hit = lines[i].toLowerCase().indexOf(query);
+                        const line = lines[i], folded = line.toLowerCase(), hit = folded.indexOf(query);
                         if (hit < 0) continue;
-                        items.push({ path: name, revision: saved.revision, line: i + 1, snippet: lines[i].slice(Math.max(0, hit - 100), hit + 400) });
+                        let originalHit = hit;
+                        if (folded.length !== line.length) {
+                            // Lowercase expansion (e.g. İ -> i + combining dot) shifts
+                            // UTF-16 offsets. Match the whole line to retain contextual
+                            // casing, then map the hit back to the original text.
+                            let offset = 0, foldedOffset = 0;
+                            for (const character of line) {
+                                const width = character.toLowerCase().length;
+                                if (foldedOffset + width > hit) { originalHit = offset; break; }
+                                foldedOffset += width; offset += character.length;
+                            }
+                        }
+                        items.push({ path: name, revision: saved.revision, line: i + 1, snippet: line.slice(Math.max(0, originalHit - 100), originalHit + 400) });
                         if (items.length >= 20) { limited = true; break; }
                     }
                     if (items.length >= 20) break;
