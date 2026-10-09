@@ -24,7 +24,7 @@ test('registers stable plugin ID and routes', () => {
     const router = Object.fromEntries(['get', 'put', 'delete', 'post'].map(method => [method, route => routes.push(`${method} ${route}`)]));
     init(router);
     assert.equal(info.id, 'gd-muyu-history');
-    assert.deepEqual(routes.sort(), ['delete /records/:id', 'get /health', 'get /records', 'get /records/:id', 'get /web/health', 'post /web/search', 'put /records/:id'].sort());
+    assert.deepEqual(routes.sort(), ['delete /records/:id', 'get /health', 'get /records', 'get /records/:id', 'get /web/health', 'post /web/search', 'put /records/:id', 'get /service/status', 'post /service/storage-check', 'get /service/diagnostics', 'post /service/diagnostics/clear'].sort());
 });
 test('persists v7 messages and enforces revision checks', async t => {
     const { dir, store } = await fixture(t);

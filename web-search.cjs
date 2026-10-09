@@ -1,5 +1,6 @@
 // Fixed-endpoint search adapter. This module never fetches a model-supplied URL.
 const UPSTREAM = 'https://api.search.brave.com/res/v1/web/search';
+const { diagnostics } = require('./diagnostics.cjs');
 const freshness = { any: '', day: 'pd', week: 'pw', month: 'pm', year: 'py' };
 const result = (status, query = '') => ({ status, provider: 'brave', query, fetchedAt: '', truncated: false, results: [] });
 const text = (value, limit) => typeof value === 'string' ? value.replace(/<[^>]*>/g, '').slice(0, limit) : '';
@@ -58,11 +59,14 @@ function createWebSearchService({ fetcher = globalThis.fetch, timeoutMs = 12000 
 function registerWebSearch(router, service = createWebSearchService()) {
     router.get('/web/health', (_req, res) => res.json({ version: 1, provider: 'brave' }));
     router.post('/web/search', (req, res) => {
+        const started = Date.now();
         const abort = new AbortController(), stop = () => { if (!res.writableEnded) abort.abort(); };
         req.on?.('aborted', stop); res.on?.('close', stop);
         void Promise.resolve().then(() => service.search(req.body, { signal: abort.signal, account: req.user?.directories?.root })).then(value => {
+            const code = { auth_error: 'WEB_AUTH_ERROR', rate_limit: 'WEB_RATE_LIMIT', timeout: 'WEB_TIMEOUT', network_error: 'WEB_NETWORK_ERROR', unavailable: 'WEB_UNAVAILABLE', invalid_response: 'WEB_INVALID_RESPONSE' }[value.status];
+            if (code && !abort.signal.aborted) diagnostics.record(req, { operation: 'search.request', stage: 'request', code, durationMs: Date.now() - started });
             if (!abort.signal.aborted) res.json(value);
-        }, () => { if (!abort.signal.aborted) res.status(400).json({ error: 'WEB_REQUEST_INVALID' }); }).finally(() => { req.off?.('aborted', stop); res.off?.('close', stop); });
+        }, () => { diagnostics.record(req, { operation: 'search.request', stage: 'request', code: 'WEB_REQUEST_INVALID', durationMs: Date.now() - started }); if (!abort.signal.aborted) res.status(400).json({ error: 'WEB_REQUEST_INVALID' }); }).finally(() => { req.off?.('aborted', stop); res.off?.('close', stop); });
     });
 }
 module.exports = { createWebSearchService, registerWebSearch };

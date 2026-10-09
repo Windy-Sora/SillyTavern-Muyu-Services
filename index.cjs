@@ -4,6 +4,8 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { registerWebSearch } = require('./web-search.cjs');
+const { registerServiceStatus } = require('./service-status.cjs');
+const { diagnostics, registerDiagnostics } = require('./diagnostics.cjs');
 
 const info = { id: 'gd-muyu-history', name: 'Group Director Muyu Services', description: 'Private Muyu conversation files and optional web search' };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -103,23 +105,28 @@ function createFileStore(dir) {
         },
     };
 }
-function respond(res, work) {
+function respond(res, work, req, operation) {
+    const started = Date.now();
     Promise.resolve().then(work).then(value => res.json(value), error => {
         const message = String(error?.message || '');
         const code = ['HISTORY_INVALID', 'HISTORY_CONFLICT', 'HISTORY_DELETED', 'HISTORY_CAPACITY', 'HISTORY_IDENTITY_UNAVAILABLE'].includes(message) ? message : 'HISTORY_UNAVAILABLE';
+        const diagnosticCode = ['EACCES', 'EPERM', 'EROFS'].includes(error?.code) ? 'SERVICE_STORAGE_PERMISSION' : error?.code === 'ENOSPC' ? 'SERVICE_STORAGE_FULL' : code;
+        diagnostics.record(req, { operation, stage: 'request', code: diagnosticCode, durationMs: Date.now() - started });
         res.status(code === 'HISTORY_CONFLICT' || code === 'HISTORY_DELETED' ? 409 : code === 'HISTORY_INVALID' ? 400 : 500).json({ error: code });
     });
 }
 function init(router) {
     registerWebSearch(router);
+    registerServiceStatus(router, { records: 64, recordBytes: maxBytes, totalBytes: 256 * 1024 * 1024, messages: 4096 });
+    registerDiagnostics(router, diagnostics);
     router.get('/health', (_req, res) => res.json({ version: 1 }));
-    router.get('/records', (req, res) => respond(res, () => createFileStore(directory(req)).list()));
-    router.get('/records/:id', (req, res) => respond(res, () => createFileStore(directory(req)).read(req.params.id)));
+    router.get('/records', (req, res) => respond(res, () => createFileStore(directory(req)).list(), req, 'history.list'));
+    router.get('/records/:id', (req, res) => respond(res, () => createFileStore(directory(req)).read(req.params.id), req, 'history.read'));
     router.put('/records/:id', (req, res) => respond(res, () => {
         const dir = directory(req), store = createFileStore(dir);
         if (req.body?.record?.id !== req.params.id) throw Error('HISTORY_INVALID');
         return store.write(req.body.record, req.body.expectedRevision);
-    }));
-    router.delete('/records/:id', (req, res) => respond(res, () => createFileStore(directory(req)).remove(req.params.id, req.body?.revision)));
+    }, req, 'history.write'));
+    router.delete('/records/:id', (req, res) => respond(res, () => createFileStore(directory(req)).remove(req.params.id, req.body?.revision), req, 'history.delete'));
 }
 module.exports = { info, init, createFileStore };
