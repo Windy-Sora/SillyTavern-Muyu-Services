@@ -40,12 +40,11 @@ function validateJson(text) {
     return { version: 1, valid: true, reason: 'SYNTAX_ONLY' };
 }
 async function directories(account, create) {
-    await canonical(account);
-    let dir = account;
+    let dir = await canonical(account);
     for (const part of ['.group-director', 'muyu', 'workspace']) {
         dir = path.join(dir, part);
         if (create) await fs.mkdir(dir).catch(error => { if (error.code !== 'EEXIST') throw error; });
-        try { await canonical(dir); }
+        try { dir = await canonical(dir); }
         catch (error) { if (!create && error.code === 'ENOENT') return null; throw error; }
     }
     return dir;
