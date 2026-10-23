@@ -1,10 +1,19 @@
 # SillyTavern Muyu Services
 
-暮羽 Agent 的可选 **SillyTavern 服务端插件**，配合 [SillyTavern Group Director](https://github.com/Windy-Sora/SillyTavern-GroupDirector) 使用。
+暮羽 Agent 的可选 **SillyTavern 服务端插件**，由 [SillyTavern GroupDirector](https://github.com/Windy-Sora/SillyTavern-GroupDirector) 和 [SillyTavern GroupWorld](https://github.com/Windy-Sora/SillyTavern-GroupWorld) 共用。使用其中任意一个客户端，只需安装这一份服务。
 
 它为暮羽提供对话文件存储、Brave 联网搜索、公开网页正文读取、本地资料检索、工作区文档草稿与 JSON 语法校验，以及服务自检和脱敏错误记录。
 
-**本仓库不包含聊天界面，也不是前端扩展。不能通过酒馆的「安装扩展」输入本仓库地址来安装。** 未安装时，暮羽仍可正常聊天并使用浏览器 IndexedDB 保存对话；这些可选服务能力不可用。
+**本仓库不包含聊天界面，也不是前端扩展。不能通过酒馆的「安装扩展」输入本仓库地址来安装。** 未安装时，暮羽的基础对话和客户端核心功能仍可使用；历史也可选择客户端支持的浏览器、账号设置或世界书存储，只有本服务提供的附加能力不可用。
+
+## 两个客户端，一份服务
+
+- 前端选择 GroupDirector 或 GroupWorld，**只启用其中一个**；服务端统一安装到 `plugins/gd-muyu-history/`，不需要再装一份 GroupWorld 专用服务。
+- 插件 ID `gd-muyu-history`、接口前缀 `/api/plugins/gd-muyu-history` 和数据目录 `.group-director/muyu/` 是共用的兼容标识。即使用 GroupWorld，也不要把它们改成 GW 或复制一套新目录。
+- 在同一酒馆账号下，两者可能使用相同的历史命名空间和文件；换客户端名称不等于获得两套隔离数据。切换前备份，保留原存档，不要同时启用两个前端或重复加载相同 ID 的服务。
+- 工具是否可用取决于客户端支持、服务能力协议、启用开关和权限，不要求两个仓库的版本号完全相同。更新服务后，在当前使用的客户端里重新检查能力。
+
+如果已明确选择“服务插件”作为历史读取来源，服务缺席时会提示存储不可用，不会静默改读另一份历史；可在客户端主动选择其他读取来源。安装服务不等于授予资料读取、写入或执行权限。
 
 ## 安装
 
@@ -50,7 +59,7 @@ enableServerPlugins: true
 
 ### 3. 在暮羽中选择要使用的能力
 
-同时更新 Group Director。打开暮羽聊天窗口的齿轮 → **存储与记忆** → **可选服务**，点击「检查服务能力」。
+更新你正在使用的 GroupDirector 或 GroupWorld 客户端。打开暮羽聊天窗口的齿轮 → **存储与记忆** → **可选服务**，点击「检查服务能力」；不需要为此安装另一个前端。
 
 根据需要开启本地资料检索、公开网页正文读取、工作区文档草稿和 JSON 语法校验。这些工具开关默认关闭，开启后从下一任务生效；安装插件或检测能力不会替用户开启它们。
 
@@ -115,7 +124,7 @@ enableServerPlugins: true
 
 ### 工作区文档草稿与 JSON 校验
 
-只创建或更新当前账户私有工作区中的平级 md/txt/json 文件，不写管理员额外资料根、脚本、酒馆配置或密钥，也不会把文档自动应用成 GD／ST 配置。
+只创建或更新当前账户私有工作区中的平级 md/txt/json 文件，不写管理员额外资料根、脚本、酒馆配置或密钥，也不会把文档自动应用成 GroupDirector、GroupWorld 或酒馆配置。
 
 模型先生成包含完整前后内容的草稿。普通模式需要用户逐份确认；全权限模式仍要求明确执行意图。读取授权不等于写入批准，安装服务也不授予写入权限。
 
@@ -125,7 +134,7 @@ enableServerPlugins: true
 - 提交检查版本并一次性消费预览；旧文件原始字节备份到私有 `workspace-backups/`，最多保留 20 份，不提供自动恢复。
 - 结果不明或传输中断时不要盲目重试，应先检查实际文件。服务进程内的串行与版本检查不是跨进程文件系统锁，不要同时用外部编辑器或另一个服务进程修改工作区。
 
-JSON 校验只检查语法、复杂度、危险键和非有限数，不验证 GD／ST 业务合同，不执行代码，也不应用配置。
+JSON 校验只检查语法、复杂度、危险键和非有限数，不验证 GroupDirector、GroupWorld 或酒馆的业务合同，不执行代码，也不应用配置。
 
 ### 自检与错误记录
 
@@ -145,7 +154,7 @@ Git 安装可在酒馆根目录运行：
 git -C plugins/gd-muyu-history pull --ff-only
 ```
 
-ZIP 安装请更新全部七个 `.cjs` 文件及 `package.json`，不要只替换 `index.cjs`。两种方式更新后都要重启酒馆；需要新工具时也应更新 Group Director 客户端。
+ZIP 安装请更新全部七个 `.cjs` 文件及 `package.json`，不要只替换 `index.cjs`。两种方式更新后都要重启酒馆；需要新工具时也应更新当前使用的 GroupDirector 或 GroupWorld 客户端。更换客户端不需要另装服务。
 
 如果暮羽显示服务不可用，依次检查：
 
@@ -177,6 +186,6 @@ ZIP 安装请更新全部七个 `.cjs` 文件及 `package.json`，不要只替�
 npm test
 ```
 
-测试使用 Node 内置测试器和隔离测试数据，不需要真实模型或 Brave 密钥。运行时文件与 Group Director 的 `muyu/server-plugin/` 保持同步，本仓库独立维护安装说明与测试。
+测试使用 Node 内置测试器和隔离测试数据，不需要真实模型或 Brave 密钥。共享运行时文件与 GroupDirector、GroupWorld 的 `muyu/server-plugin/` 保持同步，本仓库独立维护安装说明与测试。产品展示名称可以不同，兼容标识和协议不能随品牌改名。
 
 MIT License · Copyright (c) 2026 Windy-Sora.
