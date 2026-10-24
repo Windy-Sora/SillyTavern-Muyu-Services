@@ -1,5 +1,7 @@
 # SillyTavern Muyu Services
 
+[简体中文](README.md) | [English](README_EN.md)
+
 暮羽 Agent 的可选 **SillyTavern 服务端插件**，由 [SillyTavern GroupDirector](https://github.com/Windy-Sora/SillyTavern-GroupDirector) 和 [SillyTavern GroupWorld](https://github.com/Windy-Sora/SillyTavern-GroupWorld) 共用。使用其中任意一个客户端，只需安装这一份服务。
 
 它为暮羽提供对话文件存储、Brave 联网搜索、公开网页正文读取、本地资料检索、工作区文档草稿与 JSON 语法校验，以及服务自检和脱敏错误记录。
